@@ -51,32 +51,33 @@ async def ask(data: RequestData):
     video_url = data.video_url
     topic = data.topic
 
-    # Extract video ID
-    if "youtu.be" in video_url:
-        video_id = video_url.split("/")[-1]
+    model = genai.GenerativeModel("gemini-2.0-flash")
+
+    prompt = f"""
+Find the FIRST timestamp when this topic is spoken.
+
+Topic:
+{topic}
+
+Return ONLY timestamp in HH:MM:SS format.
+Example:
+00:05:47
+"""
+
+    response = model.generate_content(
+        f"{video_url}\n{prompt}"
+    )
+
+    import re
+
+    text = response.text
+
+    match = re.search(r"\d{2}:\d{2}:\d{2}", text)
+
+    if match:
+        timestamp = match.group()
     else:
-        video_id = video_url.split("v=")[-1].split("&")[0]
-
-    # Get transcript (NEW METHOD)
-    ytt_api = YouTubeTranscriptApi()
-    transcript = ytt_api.fetch(video_id)
-
-    timestamp_seconds = 60
-
-    for line in transcript:
-        text = line.text
-        start = int(line.start)
-
-        if topic.lower() in text.lower():
-            timestamp_seconds = start
-            break
-
-    # Convert HH:MM:SS
-    hours = timestamp_seconds // 3600
-    minutes = (timestamp_seconds % 3600) // 60
-    seconds = timestamp_seconds % 60
-
-    timestamp = f"{hours:02}:{minutes:02}:{seconds:02}"
+        timestamp = "00:01:00"
 
     return {
         "timestamp": timestamp,
