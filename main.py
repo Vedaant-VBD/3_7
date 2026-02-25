@@ -5,6 +5,7 @@ import google.generativeai as genai
 import time
 import os
 from datetime import timedelta
+from fastapi.middleware.cors import CORSMiddleware
 
 import os
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
@@ -21,6 +22,14 @@ class RequestData(BaseModel):
 def format_time(seconds):
     seconds = int(seconds)
     return str(timedelta(seconds=seconds))
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def home():
