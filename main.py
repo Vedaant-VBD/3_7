@@ -43,6 +43,8 @@ async def head():
 from youtube_transcript_api import YouTubeTranscriptApi
 import re
 
+from youtube_transcript_api import YouTubeTranscriptApi
+
 @app.post("/ask")
 async def ask(data: RequestData):
 
@@ -50,22 +52,26 @@ async def ask(data: RequestData):
     topic = data.topic
 
     # Extract video ID
-    video_id = video_url.split("v=")[-1].split("&")[0]
-
     if "youtu.be" in video_url:
         video_id = video_url.split("/")[-1]
+    else:
+        video_id = video_url.split("v=")[-1].split("&")[0]
 
-    # Get transcript
-    transcript = YouTubeTranscriptApi.get_transcript(video_id)
+    # Get transcript (NEW METHOD)
+    ytt_api = YouTubeTranscriptApi()
+    transcript = ytt_api.fetch(video_id)
 
-    timestamp_seconds = 60  # default
+    timestamp_seconds = 60
 
     for line in transcript:
-        if topic.lower() in line['text'].lower():
-            timestamp_seconds = int(line['start'])
+        text = line.text
+        start = int(line.start)
+
+        if topic.lower() in text.lower():
+            timestamp_seconds = start
             break
 
-    # Convert to HH:MM:SS
+    # Convert HH:MM:SS
     hours = timestamp_seconds // 3600
     minutes = (timestamp_seconds % 3600) // 60
     seconds = timestamp_seconds % 60
