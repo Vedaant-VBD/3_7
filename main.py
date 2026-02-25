@@ -6,8 +6,8 @@ import time
 import os
 from datetime import timedelta
 
-# Gemini API Key
-genai.configure(api_key="YOUR_GEMINI_API_KEY")
+import os
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 app = FastAPI()
 
