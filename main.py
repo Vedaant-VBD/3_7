@@ -35,18 +35,21 @@ app.add_middleware(
 def home():
     return {"status": "running"}
 
+@app.head("/")
+async def head():
+    return {}
+
+    
 @app.post("/ask")
-def ask(data: RequestData):
+async def ask(data: RequestData):
 
     video_url = data.video_url
     topic = data.topic
 
-    audio_file = "audio.mp3"
-
-    # Step 1 — Download Audio Only
+    # Download audio
     ydl_opts = {
         'format': 'bestaudio/best',
-        'outtmpl': audio_file,
+        'outtmpl': 'audio',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
@@ -57,43 +60,40 @@ def ask(data: RequestData):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([video_url])
 
+    # Upload audio
+    file = genai.upload_file(path="audio.mp3")
 
-    # Step 2 — Upload to Gemini Files API
-    file = genai.upload_file(audio_file)
-
-    # Step 3 — Wait Until ACTIVE
+    # Wait ACTIVE
     while file.state.name != "ACTIVE":
         time.sleep(2)
         file = genai.get_file(file.name)
 
-
-    # Step 4 — Ask Gemini
     model = genai.GenerativeModel("gemini-2.0-flash")
 
     prompt = f"""
-    Find the FIRST timestamp when this topic is spoken:
+Find first timestamp when topic is spoken.
 
-    Topic:
-    {topic}
+Topic: {topic}
 
-    Return ONLY timestamp in HH:MM:SS format.
-    Example:
-    00:05:47
-    """
+Return ONLY HH:MM:SS
+"""
 
-    response = model.generate_content(
-        [file, prompt]
-    )
+    response = model.generate_content([file, prompt])
 
-    timestamp = response.text.strip()
+    import re
 
+    raw = response.text.strip()
 
-    # Step 5 — Cleanup File
-    if os.path.exists(audio_file):
-        os.remove(audio_file)
+    match = re.search(r'\d{2}:\d{2}:\d{2}', raw)
 
+    if match:
+        timestamp = match.group()
+    else:
+        timestamp = "00:01:00"
 
-    # Step 6 — Return Response
+    if os.path.exists("audio.mp3"):
+        os.remove("audio.mp3")
+
     return {
         "timestamp": timestamp,
         "video_url": video_url,
