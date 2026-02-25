@@ -40,59 +40,37 @@ async def head():
     return {}
 
     
+from youtube_transcript_api import YouTubeTranscriptApi
+import re
+
 @app.post("/ask")
 async def ask(data: RequestData):
 
     video_url = data.video_url
     topic = data.topic
 
-    # Download audio
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': 'audio',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-        }],
-        'quiet': True
-    }
+    # Extract video ID
+    video_id = video_url.split("v=")[-1].split("&")[0]
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([video_url])
+    if "youtu.be" in video_url:
+        video_id = video_url.split("/")[-1]
 
-    # Upload audio
-    file = genai.upload_file(path="audio.mp3")
+    # Get transcript
+    transcript = YouTubeTranscriptApi.get_transcript(video_id)
 
-    # Wait ACTIVE
-    while file.state.name != "ACTIVE":
-        time.sleep(2)
-        file = genai.get_file(file.name)
+    timestamp_seconds = 60  # default
 
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    for line in transcript:
+        if topic.lower() in line['text'].lower():
+            timestamp_seconds = int(line['start'])
+            break
 
-    prompt = f"""
-Find first timestamp when topic is spoken.
+    # Convert to HH:MM:SS
+    hours = timestamp_seconds // 3600
+    minutes = (timestamp_seconds % 3600) // 60
+    seconds = timestamp_seconds % 60
 
-Topic: {topic}
-
-Return ONLY HH:MM:SS
-"""
-
-    response = model.generate_content([file, prompt])
-
-    import re
-
-    raw = response.text.strip()
-
-    match = re.search(r'\d{2}:\d{2}:\d{2}', raw)
-
-    if match:
-        timestamp = match.group()
-    else:
-        timestamp = "00:01:00"
-
-    if os.path.exists("audio.mp3"):
-        os.remove("audio.mp3")
+    timestamp = f"{hours:02}:{minutes:02}:{seconds:02}"
 
     return {
         "timestamp": timestamp,
