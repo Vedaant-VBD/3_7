@@ -22,6 +22,9 @@ def format_time(seconds):
     seconds = int(seconds)
     return str(timedelta(seconds=seconds))
 
+@app.get("/")
+def home():
+    return {"status": "running"}
 
 @app.post("/ask")
 def ask(data: RequestData):
